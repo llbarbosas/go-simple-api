@@ -1,16 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
-	"regexp"
-
-	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type UserHandler struct {
-	users []*User
+	*sql.DB
 }
 
 func (h *UserHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -27,49 +25,17 @@ func (h *UserHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-type Role int8
+func NewUserHandler(db *sql.DB) *UserHandler {
+	handler := new(UserHandler)
 
-const (
-	UserRole  Role = 0
-	AdminRole Role = 1
-)
-
-type User struct {
-	ID       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	Email    string    `json:"email"`
-	Password []byte    `json:"password"`
-	Role     `json:"role"`
-}
-
-type PlainUser struct {
-	Name     string
-	Email    string
-	Password string
-}
-
-func NewUser(data PlainUser) (*User, error) {
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(data.Password), 2)
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS USERS (id text, name text, email text, password text, role integer)")
 
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
-	matched, err := regexp.MatchString("@golang.com$", data.Email)
-
-	if err != nil {
-		return nil, err
-	}
-
-	var role Role
-
-	if matched {
-		role = AdminRole
-	} else {
-		role = UserRole
-	}
-
-	return &User{uuid.New(), data.Name, data.Email, passwordHash, role}, nil
+	handler.DB = db
+	return handler
 }
 
 // Create a new user
@@ -92,8 +58,6 @@ func (h *UserHandler) Create(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	h.users = append(h.users, user)
 
 	js, err := json.Marshal(user)
 

@@ -1,21 +1,34 @@
 package main
 
 import (
+	"database/sql"
+	"log"
 	"net/http"
 )
 
 func main() {
-	a := &app{
-		UserHandler: new(UserHandler),
+	db, err := sql.Open("sqlite3", "data.db")
+
+	if err != nil {
+		log.Fatal(err)
 	}
-	http.ListenAndServe(":8000", a)
+
+	a := &App{
+		UserHandler: NewUserHandler(db),
+	}
+
+	err = http.ListenAndServe(":8000", a)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
-type app struct {
+type App struct {
 	UserHandler *UserHandler
 }
 
-func (a *app) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+func (a *App) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var head string
 	head, req.URL.Path = ShiftPath(req.URL.Path)
 
